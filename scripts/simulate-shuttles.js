@@ -88,6 +88,15 @@ const getAvailableSeats = (baseSeats) => {
   return Math.max(0, baseSeats + Math.floor(Math.random() * 5) - 2);
 };
 
+// Generate a simple ETA based on route progress
+const generateETA = (currentRouteIndex, routeLength) => {
+  const remainingPoints = routeLength - 1 - currentRouteIndex;
+  if (remainingPoints <= 1) return "Arrived";
+  if (remainingPoints <= 3) return "2-3 min";
+  if (remainingPoints <= 5) return "4-6 min";
+  return "7+ min";
+};
+
 class ShuttleSimulator {
   constructor() {
     this.shuttleStates = {};
@@ -179,10 +188,16 @@ class ShuttleSimulator {
       // Get available seats (only numbers now)
       const availableSeats = getAvailableSeats(currentPoint.seats);
 
+      // Generate ETA
+      const estimatedArrival = generateETA(
+        state.currentRouteIndex,
+        state.route.length
+      );
+
       // Update database with correct column order
       const sql = `
       UPDATE shuttles 
-      SET destination = ?, available_seats = ?, remarks = ?, latitude = ?, longitude = ?, last_updated = NOW()
+      SET destination = ?, available_seats = ?, remarks = ?, latitude = ?, longitude = ?, estimated_arrival = ?, updated_at = NOW()
       WHERE shuttle_number = ?
     `;
 
@@ -192,6 +207,7 @@ class ShuttleSimulator {
         randomRemarks,
         position.lat,
         position.lng,
+        estimatedArrival, // New ETA field
         shuttleNumber,
       ]);
 
@@ -230,7 +246,7 @@ class ShuttleSimulator {
       }
 
       console.log(
-        `Shuttle ${shuttleNumber} -> ${currentPoint.destination} | Seats: ${availableSeats} | ${randomRemarks}`
+        `Shuttle ${shuttleNumber} -> ${currentPoint.destination} | Seats: ${availableSeats} | ${randomRemarks} | ETA: ${estimatedArrival}`
       );
     } catch (error) {
       console.error(`Error updating shuttle ${shuttleNumber}:`, error.message);

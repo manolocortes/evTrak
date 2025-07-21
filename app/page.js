@@ -7,7 +7,6 @@ import Map from "../components/Map";
 export default function LiveTracker() {
   const [currentTime, setCurrentTime] = useState("");
   const [shuttleData, setShuttleData] = useState([]);
-  const [lastUpdateTime, setLastUpdateTime] = useState(null);
 
   useEffect(() => {
     const updateTime = () => {
@@ -74,7 +73,6 @@ export default function LiveTracker() {
 
         socket.on("shuttle-update", (data) => {
           console.log("Received shuttle update:", data);
-          setLastUpdateTime(new Date());
 
           if (data.type === "shuttle-location-update" && data.shuttle) {
             setShuttleData((prevData) => {
@@ -126,11 +124,6 @@ export default function LiveTracker() {
       <div className="bg-green-700 text-white px-4 py-3 flex justify-between items-center">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-semibold">evTrak - Live Tracker</h1>
-          {lastUpdateTime && (
-            <div className="text-xs text-green-200">
-              Last update: {lastUpdateTime.toLocaleTimeString()}
-            </div>
-          )}
         </div>
         <div className="text-lg font-medium">{currentTime}</div>
       </div>
@@ -162,7 +155,7 @@ export default function LiveTracker() {
                     Status
                   </th>
                   <th className="px-3 py-2 text-left text-sm font-medium">
-                    Last Updated
+                    ETA
                   </th>
                 </tr>
               </thead>
@@ -189,9 +182,7 @@ export default function LiveTracker() {
                       {shuttle.remarks || "—"}
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-500">
-                      {shuttle.last_updated
-                        ? new Date(shuttle.last_updated).toLocaleTimeString()
-                        : "—"}
+                      {shuttle.estimated_arrival || "—"}
                     </td>
                   </tr>
                 ))}
@@ -208,6 +199,7 @@ export default function LiveTracker() {
             Active Shuttles:{" "}
             {shuttleData.filter((s) => s.latitude && s.longitude).length}
           </span>
+          <span className="text-sm">Total Shuttles: {shuttleData.length}</span>
         </div>
         <div className="text-lg font-bold">USC TC</div>
       </div>

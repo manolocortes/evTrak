@@ -23,12 +23,13 @@ export async function PUT(request) {
       destination,
       available_seats,
       remarks,
+      estimated_arrival,
     } = await request.json();
 
     const db = await createConnection();
     const sql = `
       UPDATE shuttles 
-      SET destination = ?, available_seats = ?, remarks = ?, latitude = ?, longitude = ?, last_updated = NOW()
+      SET destination = ?, available_seats = ?, remarks = ?, latitude = ?, longitude = ?, estimated_arrival = ?, last_updated = NOW()
       WHERE shuttle_number = ?
     `;
 
@@ -38,6 +39,7 @@ export async function PUT(request) {
       remarks,
       latitude,
       longitude,
+      estimated_arrival,
       shuttle_number,
     ]);
 
