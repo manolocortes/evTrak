@@ -28,15 +28,15 @@ app.prepare().then(() => {
   });
 
   io.on("connection", (socket) => {
-    console.log("✅ Client connected:", socket.id);
+    console.log("Client connected:", socket.id);
 
     socket.emit("welcome", {
-      message: "Connected to evTrak server",
+      message: "Connected",
       timestamp: new Date().toISOString(),
     });
 
     socket.on("disconnect", (reason) => {
-      console.log("❌ Client disconnected:", socket.id, "Reason:", reason);
+      console.log("Client disconnected:", socket.id, "Reason:", reason);
     });
 
     socket.on("error", (error) => {
@@ -64,14 +64,14 @@ app.prepare().then(() => {
       process.exit(1);
     })
     .listen(port, () => {
-      console.log(`✅ Server ready on http://${hostname}:${port}`);
-      console.log("✅ Socket.io server initialized");
+      console.log(`Server ready on http://${hostname}:${port}`);
+      console.log("Socket.io server initialized");
     });
 });
 
 const setupRedisSubscriber = async (io) => {
   try {
-    console.log("🔧 Setting up Redis subscriber...");
+    console.log("Setting up Redis subscriber...");
     const subscriber = await getRedisSubscriber();
 
     await subscriber.subscribe("shuttle-updates", (message) => {
@@ -79,7 +79,7 @@ const setupRedisSubscriber = async (io) => {
         const data = JSON.parse(message);
         io.emit("shuttle-update", data);
         console.log(
-          "📡 Broadcasted shuttle update to",
+          "Broadcasted shuttle update to",
           io.engine.clientsCount,
           "clients"
         );
@@ -88,9 +88,9 @@ const setupRedisSubscriber = async (io) => {
       }
     });
 
-    console.log("✅ Redis subscriber set up successfully");
+    console.log("Redis subscriber set up successfully");
   } catch (error) {
-    console.error("❌ Redis subscriber setup failed:", error);
-    console.log("⚠️  Continuing without Redis - real-time updates disabled");
+    console.error("Redis subscriber setup failed:", error);
+    console.log("Continuing without Redis - real-time updates disabled");
   }
 };

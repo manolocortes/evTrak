@@ -107,7 +107,6 @@ class ShuttleSimulator {
 
       const currentPoint = state.route[state.currentRouteIndex]
 
-      // Use exact route coordinates
       const position = {
         lat: currentPoint.lat,
         lng: currentPoint.lng,
