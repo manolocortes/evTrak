@@ -19,6 +19,7 @@ export default function LiveTracker() {
   const [currentTime, setCurrentTime] = useState("")
   const [shuttleData, setShuttleData] = useState([])
   const [notification, setNotification] = useState(null);
+  const [clientLocation, setClientLocation] = useState(''); // NEW: State for the device's location
 
   // This function filters out shuttles that have passed the destination
   const getShuttleTableData = () => {
@@ -28,7 +29,6 @@ export default function LiveTracker() {
     for (let i = 0; i < Math.min(shuttlesForTable.length, 10); i++) {
       tableData.push(shuttlesForTable[i])
     }
-    // *** THE FIX: Corrected the syntax in the for loop condition ***
     for (let i = shuttlesForTable.length; i < 10; i++) {
       tableData.push({
         shuttle_number: "",
@@ -56,6 +56,13 @@ export default function LiveTracker() {
   }, [])
 
   useEffect(() => {
+    // NEW: Get the location from the URL query parameter on component mount
+    const params = new URLSearchParams(window.location.search);
+    const location = params.get('location'); // Will be 'SAS', 'SAFAD', or null
+    if (location) {
+        setClientLocation(location.toUpperCase());
+    }
+    
     let socket
 
     const initializeConnection = async () => {
@@ -94,9 +101,14 @@ export default function LiveTracker() {
             });
           }
           
-          // Handles the EXIT event from the main geofence (SAS/SAFAD)
-          if (data.type === "shuttle-geofence-event" && data.shuttle) {
-            const message = `Shuttle #${data.shuttle.shuttle_number} has left the destination area.`;
+          // MODIFIED: Handles the EXIT event ONLY if it matches this device's location
+          if (
+            data.type === "shuttle-geofence-event" &&
+            data.event === "exit" &&
+            clientLocation && // Ensure this device has a location set
+            data.location === clientLocation // The crucial check
+          ) {
+            const message = `Shuttle #${data.shuttle.shuttle_number} has left the ${clientLocation} area.`;
             setNotification(message);
             
             setShuttleData((prevData) => 
@@ -110,7 +122,7 @@ export default function LiveTracker() {
             setTimeout(() => setNotification(null), 7000);
           }
 
-          // *** NEW LOGIC: Handles the RE-ENTRY event from the Portal geofence ***
+          // Handles the RE-ENTRY event from the Portal geofence (this is global)
           if (data.type === "shuttle-reentry-event" && data.shuttle) {
             const message = `Shuttle #${data.shuttle.shuttle_number} has re-entered the route.`;
             setNotification(message);
@@ -138,7 +150,7 @@ export default function LiveTracker() {
         disconnectSocket()
       }
     }
-  }, [])
+  }, [clientLocation]) // Dependency array includes clientLocation
 
   const getSeatColor = (seats) => {
     if (typeof seats === "number") {
@@ -151,9 +163,9 @@ export default function LiveTracker() {
   
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Header */}
+      {/* MODIFIED: Display the current location in the header */}
       <div className="bg-green-700 text-white px-4 py-3 flex justify-between items-center">
-        <h1 className="text-xl font-semibold">evTraK</h1>
+        <h1 className="text-xl font-semibold">evTraK - {clientLocation || 'Main View'}</h1>
         <div className="text-lg font-medium">{currentTime}</div>
       </div>
 

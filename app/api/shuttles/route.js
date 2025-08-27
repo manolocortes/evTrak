@@ -17,12 +17,10 @@ let cachedPolygons = {};
 async function getGeofenceByName(db, name) {
   if (!name) return null;
 
-  // If we have a cached polygon for this name, return it.
   if (cachedPolygons[name]) {
     return cachedPolygons[name];
   }
 
-  // Otherwise, fetch it from the database.
   console.log(`Fetching geofence for location: ${name}`);
   const [geofenceData] = await db.query(
     "SELECT coordinates FROM geofences WHERE name = ?",
@@ -37,7 +35,6 @@ async function getGeofenceByName(db, name) {
   const polygonCoords = JSON.parse(geofenceData[0].coordinates);
   const polygon = polygonCoords.map(p => new Point(p.x, p.y));
   
-  // Update the cache for this specific geofence
   cachedPolygons[name] = polygon;
   
   return polygon;
@@ -69,57 +66,26 @@ export async function PUT(request) {
     } = await request.json();
 
     const db = await createConnection();
+    const publisher = await getRedisPublisher();
     
-    // --- DUAL GEOFENCE LOGIC ---
-    const locationName = process.env.EVTRAK_LOCATION;
+    // --- LOCATION-SPECIFIC GEOFENCE LOGIC ---
     
-    // 1. Get the geofences for the main location and the re-entry portal.
-    const mainGeofence = await getGeofenceByName(db, locationName);
-    const portalGeofence = await getGeofenceByName(db, 'Portal');
+    // NEW: Define your primary destination locations and the re-entry portal
+    const destinationNames = ['SAS', 'SAFAD']; 
+    const portalGeofenceName = 'Portal';
 
-    let shouldPublishExitEvent = false;
-    let shouldPublishReentryEvent = false;
-
-    // 2. Get the shuttle's last known position.
+    // Get the shuttle's last known position BEFORE updating it
     const [oldShuttleData] = await db.query(
       "SELECT latitude, longitude FROM shuttles WHERE shuttle_number = ?",
       [shuttle_number]
     );
 
-    const newPoint = new Point(longitude, latitude);
-    let wasInsideMain = false;
-    let wasInsidePortal = false;
-
-    if (oldShuttleData[0] && oldShuttleData[0].latitude && oldShuttleData[0].longitude) {
-      const oldPoint = new Point(oldShuttleData[0].longitude, oldShuttleData[0].latitude);
-      if (mainGeofence) wasInsideMain = isPointInsidePolygon(mainGeofence, oldPoint);
-      if (portalGeofence) wasInsidePortal = isPointInsidePolygon(portalGeofence, oldPoint);
-    }
-
-    // 3. Check for an EXIT from the main geofence.
-    if (mainGeofence) {
-      const isNowInsideMain = isPointInsidePolygon(mainGeofence, newPoint);
-      if (wasInsideMain && !isNowInsideMain) {
-        shouldPublishExitEvent = true;
-      }
-    }
-
-    // 4. Check for an ENTRY into the portal geofence.
-    if (portalGeofence) {
-      const isNowInsidePortal = isPointInsidePolygon(portalGeofence, newPoint);
-      if (!wasInsidePortal && isNowInsidePortal) {
-        shouldPublishReentryEvent = true;
-      }
-    }
-    
-    // --- END GEOFENCE LOGIC ---
-
+    // Update the shuttle's data in the database first
     const updateSql = `
       UPDATE shuttles 
       SET destination = ?, available_seats = ?, remarks = ?, latitude = ?, longitude = ?, estimated_arrival = ?, updated_at = NOW()
       WHERE shuttle_number = ?
     `;
-
     await db.query(updateSql, [
       destination,
       available_seats,
@@ -130,54 +96,70 @@ export async function PUT(request) {
       shuttle_number,
     ]);
 
+    // Get the fully updated shuttle object to include in the payload
     const [updatedShuttle] = await db.query(
       "SELECT * FROM shuttles WHERE shuttle_number = ?",
       [shuttle_number]
     );
+    const shuttlePayload = updatedShuttle[0];
 
-    try {
-      const publisher = await getRedisPublisher();
+    // Always publish the general location update
+    await publisher.publish(
+      "shuttle-updates",
+      JSON.stringify({
+        type: "shuttle-location-update",
+        shuttle: shuttlePayload,
+      })
+    );
 
-      // Always publish the general location update
-      await publisher.publish(
-        "shuttle-updates",
-        JSON.stringify({
-          type: "shuttle-location-update",
-          shuttle: updatedShuttle[0],
-        })
-      );
+    const newPoint = new Point(longitude, latitude);
 
-      // Publish the exit event if triggered
-      if (shouldPublishExitEvent) {
-        console.log(`Shuttle ${shuttle_number} has exited the '${locationName}' geofence.`);
-        await publisher.publish(
-          "shuttle-updates",
-          JSON.stringify({
-            type: "shuttle-geofence-event",
-            event: "exit",
-            shuttle: updatedShuttle[0],
-          })
-        );
+    // Check for events only if we have a previous location to compare against
+    if (oldShuttleData[0] && oldShuttleData[0].latitude && oldShuttleData[0].longitude) {
+      const oldPoint = new Point(oldShuttleData[0].longitude, oldShuttleData[0].latitude);
+
+      // MODIFIED: Check for an EXIT from ANY of the main destination geofences
+      for (const name of destinationNames) {
+        const geofence = await getGeofenceByName(db, name);
+        if (geofence) {
+          const wasInside = isPointInsidePolygon(geofence, oldPoint);
+          const isNowInside = isPointInsidePolygon(geofence, newPoint);
+
+          if (wasInside && !isNowInside) {
+            console.log(`Shuttle ${shuttle_number} has exited the '${name}' geofence.`);
+            await publisher.publish(
+              "shuttle-updates",
+              JSON.stringify({
+                type: "shuttle-geofence-event",
+                event: "exit",
+                location: name, // KEY CHANGE: Include the specific location name
+                shuttle: shuttlePayload,
+              })
+            );
+          }
+        }
       }
 
-      // Publish the re-entry event if triggered
-      if (shouldPublishReentryEvent) {
-        console.log(`Shuttle ${shuttle_number} has entered the 'Portal' geofence.`);
-        await publisher.publish(
-          "shuttle-updates",
-          JSON.stringify({
-            type: "shuttle-reentry-event",
-            event: "enter",
-            shuttle: updatedShuttle[0],
-          })
-        );
+      // Check for an ENTRY into the portal geofence (for re-entry)
+      const portalGeofence = await getGeofenceByName(db, portalGeofenceName);
+      if (portalGeofence) {
+        const wasInsidePortal = isPointInsidePolygon(portalGeofence, oldPoint);
+        const isNowInsidePortal = isPointInsidePolygon(portalGeofence, newPoint);
+        if (!wasInsidePortal && isNowInsidePortal) {
+          console.log(`Shuttle ${shuttle_number} has entered the '${portalGeofenceName}' geofence.`);
+          await publisher.publish(
+            "shuttle-updates",
+            JSON.stringify({
+              type: "shuttle-reentry-event",
+              event: "enter",
+              shuttle: shuttlePayload,
+            })
+          );
+        }
       }
-
-    } catch (redisError) {
-      console.warn("Redis publish failed:", redisError.message);
     }
-
-    return NextResponse.json({ success: true, shuttle: updatedShuttle[0] });
+    
+    return NextResponse.json({ success: true, shuttle: shuttlePayload });
   } catch (error) {
     console.log(error);
     return NextResponse.json({ error: error.message });
