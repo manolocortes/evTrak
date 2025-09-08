@@ -114,9 +114,7 @@ class ShuttleSimulator {
         latitude: currentPoint.lat,
         longitude: currentPoint.lng,
         // You can add mock data for other fields if needed
-        destination: "Main Campus",
         available_seats: Math.floor(Math.random() * 10) + 1,
-        remarks: "On schedule",
         estimated_arrival: "5 mins",
       };
 
