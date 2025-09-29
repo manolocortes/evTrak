@@ -2,7 +2,7 @@ import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import L from "leaflet";
 
-function GetIcon(shuttle_number) {
+function GetIcon(shuttle_id) {
   return new L.DivIcon({
     html: `
         <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
@@ -13,12 +13,12 @@ function GetIcon(shuttle_number) {
             color: white; 
             padding: 2px 6px; 
             border-radius: 4px; 
-            font-size: 20px; 
+            font-size: 12px; 
             font-weight: bold; 
             margin-top: 2px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             white-space: nowrap;
-          ">${shuttle_number}</div>
+          ">${shuttle_id}</div>
         </div>
       `,
       className: "custom-shuttle-marker",
@@ -49,9 +49,9 @@ function Map({ height = "100vh", shuttles = [] }) {
         .filter((s) => s.latitude && s.longitude)
         .map((shuttle) => (
           <Marker
-            key={shuttle.shuttle_number}
+            key={shuttle.shuttle_id}
             position={[shuttle.latitude, shuttle.longitude]}
-            icon={GetIcon(shuttle.shuttle_number)}
+            icon={GetIcon(shuttle.shuttle_id)}
           />
         ))}
     </MapContainer>
