@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getSocket, disconnectSocket } from "@/lib/socket-client";
-import Map from "../../components/Map";
+import Map from "@/components/Map";
 
 export default function LiveTracker() {
   const [currentTime, setCurrentTime] = useState("");
@@ -118,9 +118,8 @@ export default function LiveTracker() {
         <table className="w-full">
           <thead className="bg-green-600 text-white">
             <tr>
-              <th className="px-4 py-2 text-left text-sm font-medium uppercase tracking-wider">Shuttle ID</th>
-              <th className="px-4 py-2 text-left text-sm font-medium uppercase tracking-wider">Available Seats</th>
-              <th className="px-4 py-2 text-left text-sm font-medium uppercase tracking-wider">ETA</th>
+              <th className="px-3 py-2 text-left text-sm font-medium">Shuttle ID</th>
+              <th className="px-3 py-2 text-left text-sm font-medium">Available Seats</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -131,12 +130,11 @@ export default function LiveTracker() {
                   <td className={`px-4 py-3 text-sm font-bold ${getSeatColor(shuttle.available_seats)}`}>
                     {shuttle.available_seats ?? "—"}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{shuttle.eta || "—"}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="3" className="text-center py-10 px-4 text-gray-500">
+                <td colSpan="2" className="text-center py-10 px-4 text-gray-500">
                   No active shuttles at the moment.
                 </td>
               </tr>
