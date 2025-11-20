@@ -3,7 +3,7 @@
 const https = require('https');
 const axios = require('axios');
 
-const API_URL = 'http://192.168.50.176:5001/api/shuttles'; // Ensure this URL and port are correct
+const API_URL = 'http://192.168.50.176:5005/api/shuttles'; // Ensure this URL and port are correct
 const AUTH_USER = 'admin';
 const AUTH_PASS = 'admin';
 
